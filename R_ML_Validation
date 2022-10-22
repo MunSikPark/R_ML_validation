@@ -1,0 +1,176 @@
+# This is 'R' code for validating ML model
+
+# Part 1: Regression with Single Model -----------------------------------------
+# Performance Evaluation Function -----------------------------------------
+perf_eval <- function(target, haty){
+  
+  # Mean squared error (MSE)
+  MSE <- mean((target - haty)^2)
+  # Root mean squared error (RMSE)
+  RMSE <- sqrt(MSE)
+  # Mean absolute error
+  MAE <- mean(abs(target-haty))
+
+  return(c(MSE, RMSE, MAE, MAPE))
+}
+
+perf_table <- matrix(0, nrow = 5, ncol = 4)
+rownames(perf_table) <- c("MLR", "ANN", "Bagging ANN", "GBM", "Random Forests")
+colnames(perf_table) <- c("MSE", "RMSE", "MAE", "MAPE")
+
+# Read data file
+SampleEV <- read.csv("C:/Users/HP/0913_office_input_equation.csv")
+
+nCar <- nrow(SampleEV)
+nVar <- ncol(SampleEV)
+
+id_idx <- c(1)
+category_idx <- 10
+
+#Transform a categorical Variable into a set of binary variables (One-hot encoding)
+dummy_a <- rep(0,nCar)
+dummy_b <- rep(0,nCar)
+
+a_idx <- which(SampleEV$Week == "0")
+b_idx <- which(SampleEV$Week == "1")
+
+dummy_a[a_idx] <- 1
+dummy_b[b_idx] <- 1
+
+week_days <- data.frame(dummy_a, dummy_b)
+names(week_days) <- c("Weekend", "Weekdays")
+
+SampleEV_mlr_data <- cbind(SampleEV[,-c(id_idx, category_idx)], week_days)
+
+# Split the data into the training/validation sets
+set.seed(12345)
+trn_idx <- sample(1:dim(SampleEV_mlr_data)[1], round(0.7*dim(SampleEV_mlr_data)[1]))
+trn_data <- SampleEV_mlr_data[trn_idx,]
+tst_data <- SampleEV_mlr_data[-trn_idx,]
+
+# Model 1: Multiple Linear Regression with forward variable selection---------------
+# Variable selection: Forward selection
+# Upperbound formula
+tmp_x <- paste(colnames(trn_data)[-1], collapse=" + ")
+tmp_xy <- paste("EnergyDemand ~ ", tmp_x, collapse = "")
+as.formula(tmp_xy)
+
+MLR_model <- step(lm(EnergyDemand ~ 1, data = trn_data), 
+                  scope = list(upper = as.formula(tmp_xy), lower = Quantity ~ 1), 
+                  direction="forward", trace=1)
+summary(MLR_model)
+
+# Show the selected variable in each step
+MLR_model$anova$Step
+MLR_model$anova$AIC
+
+# AIC decrease according the the selected variable
+plot(MLR_model$anova$AIC, pch = 17, cex=2, main = "AIC Decrease (Forward Selection)", 
+     xlab = "Number of Steps", ylab = "AIC")
+text(MLR_model$anova$AIC, MLR_model$anova$Step, cex=1, pos=3, col="blue")
+
+MLR_haty <- predict(MLR_model, newdata = tst_data)
+
+perf_table[1,] <- perf_eval(tst_data$EnergyDemand, MLR_haty)
+perf_table
+
+# Model 2: Artificial Neural Network -----------------------------------------------
+# nnet package install
+install.packages("nnet", dependencies = TRUE)
+library(nnet)
+
+SampleEV_input <- SampleEV_mlr_data[,c(-1,-2)]
+SampleEV_target <- SampleEV_mlr_data[,1]
+
+# Data normalization
+SampleEV_input_scaled <- scale(SampleEV_input, center = TRUE, scale = TRUE)
+
+# Input/Target configuration
+ANN_trn_input <- SampleEV_input_scaled[trn_idx,]
+ANN_trn_target <- SampleEV_target[trn_idx]
+
+ANN_tst_input <- SampleEV_input_scaled[-trn_idx,]
+ANN_tst_target <- SampleEV_target[-trn_idx]
+
+# Trainin ANN
+ANN_model <- nnet(ANN_trn_input, ANN_trn_target, size = 4, linout = TRUE, 
+                  decay = 5e-4, maxit = 1000)
+
+# Performance evaluation
+ANN_haty <- predict(ANN_model, ANN_tst_input)
+
+perf_table[2,] <- perf_eval(tst_data$EnergyDemand, ANN_haty)
+perf_table
+
+# Part 2: Regression with Ensemble Models -----------------------------
+# Model 3: Bagging with Neural Network ------------------------------------
+install.packages("caret")
+install.packages("doParallel")
+
+library(caret)
+library(doParallel)
+
+# Multi-core processing
+cl <- makeCluster(4)
+registerDoParallel(cl)
+
+# Bagging Training
+ptm <- proc.time()
+Bagging_ANN_model <- avNNet(ANN_trn_input, ANN_trn_target, size = 4, decay = 5e-4,
+                            linout = TRUE, repeats = 100, bag = TRUE, 
+                            allowParallel = TRUE, trace = TRUE)
+Bagging_Time <- proc.time() - ptm
+Bagging_Time
+
+# Bagging Test
+Bagging_ANN_haty <- predict(Bagging_ANN_model, newdata = ANN_tst_input)
+
+perf_table[3,] <- perf_eval(tst_data$EnergyDemand, Bagging_ANN_haty)
+perf_table
+
+# Model 4: Gradient Boosting Machine --------------------------------------
+install.packages("gbm")
+library(gbm)
+
+# Training the GBM
+ptm <- proc.time()
+GBM_model <- gbm.fit(trn_data[,-1], trn_data[,1], distribution = "gaussian", 
+                     n.trees = 1000, shrinkage = 0.02, bag.fraction = 0.8, nTrain = 1000)
+GBM_Time <- proc.time() - ptm
+GBM_Time
+
+summary(GBM_model)
+
+# Prediction
+GBM_haty <- predict(GBM_model, tst_data[,-1], type = "response")
+
+perf_table[4,] <- perf_eval(tst_data$EnergyDemand, GBM_haty)
+perf_table
+
+# Model 5: Random Forest --------------------------------------------------
+install.packages("randomForest")
+library(randomForest)
+
+# Training the Random Forest
+ptm <- proc.time()
+RF_model <- randomForest(trn_data[,-1], trn_data[,1], ntree = 43, 
+                         importance = TRUE, do.trace = TRUE)
+RF_Time <- proc.time() - ptm
+RF_Time
+
+# Check the result
+print(RF_model)
+par("mar") #It will give current dimensions
+plot(RF_model)
+RF_model$ntree
+
+# Variable importance
+Var_imp <- importance(RF_model)
+barplot(Var_imp[order(Var_imp[,1], decreasing = TRUE),1])
+importance(RF_model)
+
+# Prediction
+RF_haty <- predict(RF_model, newdata = tst_data[,-1], type = "response")
+
+perf_table[5,] <- perf_eval(tst_data$EnergyDemand, RF_haty)
+perf_table
