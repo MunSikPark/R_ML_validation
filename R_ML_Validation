@@ -11,12 +11,12 @@ perf_eval <- function(target, haty){
   # Mean absolute error
   MAE <- mean(abs(target-haty))
 
-  return(c(MSE, RMSE, MAE, MAPE))
+  return(c(MSE, RMSE, MAE))
 }
 
-perf_table <- matrix(0, nrow = 5, ncol = 4)
+perf_table <- matrix(0, nrow = 5, ncol = 3)
 rownames(perf_table) <- c("MLR", "ANN", "Bagging ANN", "GBM", "Random Forests")
-colnames(perf_table) <- c("MSE", "RMSE", "MAE", "MAPE")
+colnames(perf_table) <- c("MSE", "RMSE", "MAE")
 
 # Read data file
 SampleEV <- read.csv("C:/Users/HP/0913_office_input_equation.csv")
@@ -164,7 +164,7 @@ par("mar") #It will give current dimensions
 plot(RF_model)
 RF_model$ntree
 
-# Variable importance
+# Variable importance (RF model)
 Var_imp <- importance(RF_model)
 barplot(Var_imp[order(Var_imp[,1], decreasing = TRUE),1])
 importance(RF_model)
