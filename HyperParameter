@@ -1,0 +1,249 @@
+1.
+<GBM Hyper parameter setting>: Language Python
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+import math
+
+#Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 1000, stop = 2000, num = 1001)]
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(2, 50, num = 25)]
+# Minimum number of samples required to split a node
+min_samples_split = [2, 5, 10, 15, 100]
+# Minimum number of samples required at each leaf node
+min_samples_leaf = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+learning_rate = [0.01, 0.02, 0.03, 0.04, 0.05]
+
+# Method of selecting samples for training each tree
+# Create the random grid
+random_grid = {'n_estimators': n_estimators,
+'max_depth': max_depth,
+'min_samples_split': min_samples_split,
+'min_samples_leaf': min_samples_leaf,
+'learning_rate': learning_rate
+}
+
+# Initialize the RandomizedSearchCV object with estimators is RandomForestRegressor of
+#cross validation is 5 with n_jobs = -1 ( that is parallel processing )
+random_rf = RandomizedSearchCV(GradientBoostingRegressor(), param_distributions=random_grid, cv=5, n_jobs=-1)
+# fit the object
+random_rf.fit(X_train, y_train)
+# Display the best estimator
+print(random_rf.best_estimator_)
+# Display the best score
+print(random_rf.best_score_)
+# Display the best selected parameter by the randomizedSearchCV
+print(random_rf.best_params_)
+
+from sklearn.model_selection import GridSearchCV
+from sklearn import datasets, ensemble
+from sklearn.ensemble import GradientBoostingRegressor
+gbr_params = {'n_estimators': 1000,
+          'max_depth': 4,
+          'min_samples_split': 5,
+          'learning_rate': 0.01,
+          'loss': 'ls'}
+gbr = GradientBoostingRegressor(**gbr_params)
+
+gbr.fit(X_train, y_train)
+print("Model Accuracy: %.3f" % gbr.score(X_test, y_test))
+mse = mean_squared_error(y_test, gbr.predict(X_test))
+print("The mean squared error (MSE) on test set: {:.4f}".format(mse))
+
+2.
+<RF Hyper parameter setting>: Language Python
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+import math
+
+#Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 100, stop = 500, num = 5)]
+# Number of features to consider at every split
+max_features = ['auto', 'sqrt']
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(5, 30, num = 6)]
+# Minimum number of samples required to split a node
+min_samples_split = [2, 5, 10, 15, 100]
+# Minimum number of samples required at each leaf node
+min_samples_leaf = [1, 2, 5, 10]
+
+# Method of selecting samples for training each tree
+# Create the random grid
+random_grid = {'n_estimators': n_estimators,
+'max_features': max_features,
+'max_depth': max_depth,
+'min_samples_split': min_samples_split,
+'min_samples_leaf': min_samples_leaf
+}
+
+# Initialize the RandomizedSearchCV object with estimators is RandomForestRegressor of
+#cross validation is 5 with n_jobs = -1 ( that is parallel processing )
+random_rf = RandomizedSearchCV(RandomForestRegressor(), param_distributions=random_grid, cv=5, n_iter=10,n_jobs=-1)
+# fit the object
+random_rf.fit(X_train, y_train)
+# Display the best estimator
+print(random_rf.best_estimator_)
+# Display the best score
+print(random_rf.best_score_)
+# Display the best selected parameter by the randomizedSearchCV
+print(random_rf.best_params_)
+
+3.
+<ANN / Bagging ANN>: Language R
+# Install nnet package and prepare it
+install.packages("nnet")
+library(nnet)
+
+# Performance evaluation function for regression --------------------------
+perf_eval_reg <- function(tgt_y, pre_y){
+  
+  # RMSE
+  rmse <- sqrt(mean((tgt_y - pre_y)^2))
+  # MAE
+  mae <- mean(abs(tgt_y - pre_y))
+  # MAPE
+  mape <- 100*mean(abs((tgt_y - pre_y)/tgt_y))
+  
+  return(c(rmse, mae, mape))
+  
+}
+
+perf_table <- matrix(0, nrow = 5, ncol = 4)
+rownames(perf_table) <- c("MLR", "ANN", "Bagging ANN", "GBM", "Random Forests")
+colnames(perf_table) <- c("MSE", "RMSE", "MAE", "MAPE")
+
+# Read data file
+SampleEV <- read.csv("C:/Users/HP/0913_residence_input_equation.csv")
+
+nCar <- nrow(SampleEV)
+nVar <- ncol(SampleEV)
+
+id_idx <- c(1)
+category_idx <- 10
+
+#Transform a categorical Variable into a set of binary variables
+dummy_a <- rep(0,nCar)
+dummy_b <- rep(0,nCar)
+
+a_idx <- which(SampleEV$Week == "0")
+b_idx <- which(SampleEV$Week == "1")
+
+dummy_a[a_idx] <- 1
+dummy_b[b_idx] <- 1
+
+week_days <- data.frame(dummy_a, dummy_b)
+names(week_days) <- c("Weekend", "Weekdays")
+
+SampleEV_mlr_data <- cbind(SampleEV[,-c(1, category_idx)], week_days)
+
+n_instance <- dim(SampleEV_mlr_data)[1]
+n_var <- dim(SampleEV_mlr_data)[2]
+
+RegX <- SampleEV_mlr_data[,-1]
+RegY <- SampleEV_mlr_data[,1]
+
+# Data Normalization
+RegX <- scale(RegX, center = TRUE, scale = TRUE)
+
+# Year become zero, so just delete it
+RegX <- RegX[,-1]
+
+# Combine X and Y
+RegData <- as.data.frame(cbind(RegX, RegY))
+
+# Split the data into the training/test sets
+set.seed(12345)
+trn_idx <- sample(1:n_instance, round(0.7*n_instance))
+trn_data <- RegData[trn_idx,]
+tst_data <- RegData[-trn_idx,]
+
+perf_summary_reg <- matrix(0,3,3)
+rownames(perf_summary_reg) <- c("MLR", "k-NN", "ANN")
+colnames(perf_summary_reg) <- c("RMSE", "MAE", "MAPE")
+
+# Multiple linear regression
+full_model <- lm(RegY ~ ., data = trn_data)
+mlr_prey <- predict(full_model, newdata = tst_data)
+
+perf_summary_reg[1,] <- perf_eval_reg(tst_data$RegY, mlr_prey)
+perf_summary_reg
+
+# Evaluate the k-NN with the test data
+# k-Nearest Neighbor Learning (Regression) --------------------------------
+install.packages("FNN", dependencies = TRUE)
+library(FNN)
+library(nnet)
+
+knn_reg <- knn.reg(trn_data[,-12], test = tst_data[,-12], trn_data$RegY, k=3)
+
+knn_prey <- knn_reg$pred
+perf_summary_reg[2,] <- perf_eval_reg(tst_data$RegY, knn_prey)
+perf_summary_reg
+
+# Find the best number of hidden nodes in terms of BCR
+# Candidate hidden nodes
+nH <- seq(from=2, to=30, by=2)
+
+# 5-fold cross validation index
+val_idx <- sample(c(1:5), length(trn_idx), replace = TRUE, prob = rep(0.2,5))
+val_perf <- matrix(0, length(nH), 4)
+
+ptm <- proc.time()
+
+for (i in 1:length(nH)) {
+  
+  cat("Training ANN: the number of hidden nodes:", nH[i], "\n")
+  eval_fold <- c()
+  
+  for (j in c(1:5)) {
+    
+    # Training with the data in (k-1) folds
+    tmp_trn_data <- trn_data[which(val_idx != j), ]
+    tmp_nnet <- nnet(RegY ~ ., data = tmp_trn_data, size = nH[i], linout = TRUE, 
+                     decay = 5e-4, maxit = 500)
+    
+    # Evaluate the model withe the remaining 1 fold
+    tmp_val_input <- trn_data[which(val_idx == j),-12]
+    tmp_val_target <- trn_data[which(val_idx == j),12]    
+    
+    eval_fold <- rbind(eval_fold, cbind(tmp_val_target, predict(tmp_nnet, tmp_val_input)))
+    
+  }
+  
+  # nH
+  val_perf[i,1] <-nH[i]
+  # Record the validation performance
+  val_perf[i,2:4] <- perf_eval_reg(eval_fold[,1],eval_fold[,2])
+}
+
+proc.time() - ptm
+
+ordered_val_perf <- val_perf[order(val_perf[,3], decreasing = FALSE),]
+colnames(ordered_val_perf) <- c("nH", "RMSE", "MAE", "MAPE")
+ordered_val_perf
+
+# Find the best number of hidden node
+best_nH <- ordered_val_perf[1,1]
+
+# Train ANN with the best hidden node
+best_nnet <- nnet(RegY ~ ., data = trn_data, size = best_nH, linout = TRUE, 
+                  decay = 5e-4, maxit = 500)
+
+# Test the model and compare the performance
+ann_prey <- predict(best_nnet, tst_data[,-n_var])
+perf_summary_reg[3,] <- perf_eval_reg(tst_data$RegY, ann_prey)
+perf_summary_reg
+
